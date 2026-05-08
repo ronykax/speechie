@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "speechthing",
+      "name": "speechie",
       "dependencies": {
         "commander": "^14.0.3",
         "openai": "^6.37.0",

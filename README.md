@@ -1,4 +1,4 @@
-# speechthing
+# speechie
 
 To install dependencies:
 
@@ -8,15 +8,32 @@ bun install
 
 ## Configuration
 
-On every run, `speechthing` tries to read:
+On every run, `speechie` tries to read:
 
-`~/.config/speechthing/config.json`
+`~/.config/speechie/config.json`
+
+First-time setup (interactive):
+
+```bash
+bunx speechie config
+```
+
+This prompts for:
+
+- `api.base`
+- `api.key`
+- `audio`
+- `model`
+- `temperature` (optional)
+- `prompt` (optional)
+
+Press Enter to keep the currently saved value shown in brackets.
 
 Example:
 
 ```bash
-mkdir -p ~/.config/speechthing
-cat > ~/.config/speechthing/config.json <<'JSON'
+mkdir -p ~/.config/speechie
+cat > ~/.config/speechie/config.json <<'JSON'
 {
   "api": {
     "base": "https://api.groq.com/openai/v1",
@@ -44,37 +61,47 @@ Precedence:
 - config values are used as defaults
 - if config file is missing, CLI-only runs are supported
 
+The `speechie config` command writes canonical keys to the config file:
+`api.base`, `api.key`, `audio`, `model`, `temperature`, and `prompt`.
+Legacy aliases are still accepted when reading config.
+
 ## Usage
+
+Run interactive setup:
+
+```bash
+bunx speechie config
+```
 
 Run with config defaults:
 
 ```bash
-bunx speechthing
+bunx speechie
 ```
 
 Override audio positionally:
 
 ```bash
-bunx speechthing /path/to/override-audio.mp3
+bunx speechie /path/to/override-audio.mp3
 ```
 
 Override specific settings with flags:
 
 ```bash
-bunx speechthing /path/to/audio.mp3 -m whisper-large-v3-turbo -t 0 -p "domain words" -k "$GROQ_API_KEY"
+bunx speechie /path/to/audio.mp3 -m whisper-large-v3-turbo -t 0 -p "domain words" -k "$GROQ_API_KEY"
 ```
 
 For local development in this repo:
 
 ```bash
-bun run index.ts -- [audio] [options]
+bun run src/index.ts -- [audio] [options]
 ```
 
 If you link the package locally:
 
 ```bash
 bun link
-bunx speechthing [audio] [options]
+bunx speechie [audio] [options]
 ```
 
-Required effective values (from config and/or CLI): `api.key`, `audio`, `model`.
+Required effective values (from config and/or CLI): `api.base`, `api.key`, `audio`, `model`.
