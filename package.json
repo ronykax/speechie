@@ -1,0 +1,17 @@
+{
+  "name": "@ronykax/speechthing",
+  "bin": {
+    "speechthing": "index.ts"
+  },
+  "module": "index.ts",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "openai": "^6.37.0"
+  }
+}
