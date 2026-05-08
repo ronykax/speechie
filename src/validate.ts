@@ -1,3 +1,10 @@
+import {
+  expectedNumber,
+  expectedString,
+  missingRequiredValue,
+  valueCannotBeEmpty,
+} from "./errors";
+
 export function fail(message: string): never {
   console.error(message);
   process.exit(1);
@@ -14,18 +21,18 @@ export function readString(
 ): string | undefined {
   if (value === undefined || value === null) {
     if (required) {
-      fail(`Missing required value: ${path}`);
+      fail(missingRequiredValue(path));
     }
     return undefined;
   }
 
   if (typeof value !== "string") {
-    fail(`Expected string for ${path}.`);
+    fail(expectedString(path));
   }
 
   const trimmed = value.trim();
   if (required && trimmed.length === 0) {
-    fail(`Value cannot be empty: ${path}`);
+    fail(valueCannotBeEmpty(path));
   }
 
   return trimmed.length > 0 ? trimmed : undefined;
@@ -47,5 +54,5 @@ export function readNumber(value: unknown, path: string): number | undefined {
     }
   }
 
-  fail(`Expected number for ${path}.`);
+  fail(expectedNumber(path));
 }

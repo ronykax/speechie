@@ -25,7 +25,6 @@ This prompts for:
 - `audio`
 - `model`
 - `temperature` (optional)
-- `prompt` (optional)
 
 Press Enter to keep the currently saved value shown in brackets.
 
@@ -41,8 +40,7 @@ cat > ~/.config/speechie/config.json <<'JSON'
   },
   "audio": "/path/to/audio.mp3",
   "model": "whisper-large-v3-turbo",
-  "temperature": 0,
-  "prompt": "Optional prompt"
+  "temperature": 0
 }
 JSON
 ```
@@ -53,7 +51,6 @@ Supported config aliases:
 - `api.key` or `api.k`
 - `model` or `m`
 - `temperature` or `t`
-- `prompt` or `p`
 
 Precedence:
 
@@ -62,7 +59,7 @@ Precedence:
 - if config file is missing, CLI-only runs are supported
 
 The `speechie config` command writes canonical keys to the config file:
-`api.base`, `api.key`, `audio`, `model`, `temperature`, and `prompt`.
+`api.base`, `api.key`, `audio`, `model`, and `temperature`.
 Legacy aliases are still accepted when reading config.
 
 ## Usage
@@ -88,7 +85,7 @@ bunx speechie /path/to/override-audio.mp3
 Override specific settings with flags:
 
 ```bash
-bunx speechie /path/to/audio.mp3 -m whisper-large-v3-turbo -t 0 -p "domain words" -k "$GROQ_API_KEY"
+bunx speechie /path/to/audio.mp3 -m whisper-large-v3-turbo -t 0 -k "$GROQ_API_KEY"
 ```
 
 For local development in this repo:

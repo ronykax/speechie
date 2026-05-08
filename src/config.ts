@@ -1,4 +1,12 @@
 import { fail, isRecord, readNumber, readString } from "./validate";
+import {
+  cannotResolveHome,
+  configMustBeObject,
+  expectedNumber,
+  expectedObjectProperty,
+  invalidJsonConfig,
+  missingRequiredConfiguration,
+} from "./errors";
 
 const CONFIG_PATH = "~/.config/speechie/config.json";
 
@@ -16,19 +24,16 @@ type RawConfig = {
   m?: unknown;
   temperature?: unknown;
   t?: unknown;
-  prompt?: unknown;
-  p?: unknown;
 };
 
 type PersistedConfig = {
-  api: {
-    base: string;
-    key: string;
+  api?: {
+    base?: string;
+    key?: string;
   };
-  audio: string;
-  model: string;
+  audio?: string;
+  model?: string;
   temperature?: number;
-  prompt?: string;
 };
 
 export type ConfigDefaults = {
@@ -37,7 +42,6 @@ export type ConfigDefaults = {
   audio?: string;
   model?: string;
   temperature?: number;
-  prompt?: string;
 };
 
 export type CliOverrides = {
@@ -46,7 +50,6 @@ export type CliOverrides = {
   key?: string;
   model?: string;
   temperature?: number;
-  prompt?: string;
 };
 
 export type CliOptionValues = {
@@ -54,8 +57,46 @@ export type CliOptionValues = {
   key?: string;
   model?: string;
   temperature?: string;
-  prompt?: string;
 };
+
+export type CliOptionDefinition = {
+  key: keyof CliOptionValues;
+  flags: string;
+  description: string;
+};
+
+export const CLI_OPTION_DEFINITIONS: readonly CliOptionDefinition[] = [
+  { key: "base", flags: "-b, --base <base>", description: "API base URL" },
+  { key: "key", flags: "-k, --key <key>", description: "API key" },
+  {
+    key: "model",
+    flags: "-m, --model <model>",
+    description: "Transcription model",
+  },
+  {
+    key: "temperature",
+    flags: "-t, --temperature <temperature>",
+    description: "Sampling temperature",
+  },
+];
+
+type SharedConfigField = "base" | "key" | "model" | "temperature";
+
+const SHARED_CONFIG_FIELDS: readonly SharedConfigField[] = [
+  "base",
+  "key",
+  "model",
+  "temperature",
+];
+
+const REQUIRED_CONFIG_FIELD_HINTS: ReadonlyArray<{
+  key: "base" | "key" | "model";
+  hint: string;
+}> = [
+  { key: "base", hint: "api.base (or --base/-b)" },
+  { key: "key", hint: "api.key (or --key/-k)" },
+  { key: "model", hint: "model (or --model/-m)" },
+];
 
 export type EffectiveConfig = {
   base: string;
@@ -63,7 +104,6 @@ export type EffectiveConfig = {
   audio: string;
   model: string;
   temperature?: number;
-  prompt?: string;
 };
 
 function resolveHomePath(path: string): string {
@@ -71,7 +111,7 @@ function resolveHomePath(path: string): string {
 
   if (path === "~") {
     if (!home) {
-      fail("Cannot resolve '~' because HOME is not set.");
+      fail(cannotResolveHome(path));
     }
 
     return home;
@@ -79,7 +119,7 @@ function resolveHomePath(path: string): string {
 
   if (path.startsWith("~/")) {
     if (!home) {
-      fail(`Cannot resolve '${path}' because HOME is not set.`);
+      fail(cannotResolveHome(path));
     }
 
     return `${home.replace(/\/+$/, "")}/${path.slice(2)}`;
@@ -106,7 +146,7 @@ function getParentDirectory(path: string): string {
 function promptInput(label: string, currentValue?: string): string {
   const value = prompt(buildPromptLabel(label, currentValue));
   if (value === null) {
-    fail("Configuration aborted.");
+    return "";
   }
   return value;
 }
@@ -114,19 +154,6 @@ function promptInput(label: string, currentValue?: string): string {
 export function buildPromptLabel(label: string, currentValue?: string): string {
   const defaultHint = currentValue ? ` [${currentValue}]` : "";
   return `${label}${defaultHint}:`;
-}
-
-function promptForRequiredString(label: string, currentValue?: string): string {
-  while (true) {
-    const value = promptInput(label, currentValue);
-    const rawValue = value.trim().length === 0 ? currentValue : value;
-    const parsed = readString(rawValue, label);
-    if (parsed) {
-      return parsed;
-    }
-
-    console.error(`Value cannot be empty: ${label}`);
-  }
 }
 
 function promptForOptionalString(
@@ -153,11 +180,44 @@ function promptForOptionalNumber(
 
     const parsedValue = Number.parseFloat(rawValue);
     if (!Number.isFinite(parsedValue)) {
-      console.error(`Expected number for ${label}.`);
+      console.error(expectedNumber(label));
       continue;
     }
 
     return readNumber(rawValue, label);
+  }
+}
+
+function readSharedValueFromCli(
+  field: SharedConfigField,
+  options: CliOptionValues,
+): string | number | undefined {
+  switch (field) {
+    case "base":
+      return readString(options.base, "base");
+    case "key":
+      return readString(options.key, "key");
+    case "model":
+      return readString(options.model, "model");
+    case "temperature":
+      return readNumber(options.temperature, "temperature");
+  }
+}
+
+function readSharedValueFromConfig(
+  field: SharedConfigField,
+  raw: RawConfig,
+  api: ConfigApi,
+): string | number | undefined {
+  switch (field) {
+    case "base":
+      return readString(api.base ?? api.b, "api.base");
+    case "key":
+      return readString(api.key ?? api.k, "api.key");
+    case "model":
+      return readString(raw.model ?? raw.m, "model");
+    case "temperature":
+      return readNumber(raw.temperature ?? raw.t, "temperature");
   }
 }
 
@@ -167,17 +227,22 @@ export function parseCliOverrides(
   audio: string | undefined,
   options: CliOptionValues,
 ): CliOverrides {
+  const sharedOverrides = Object.fromEntries(
+    SHARED_CONFIG_FIELDS.map((field) => [
+      field,
+      readSharedValueFromCli(field, options),
+    ]),
+  ) as Pick<CliOverrides, SharedConfigField>;
+
   return {
     audio: readString(audio, "audio"),
-    base: readString(options.base, "base"),
-    key: readString(options.key, "key"),
-    model: readString(options.model, "model"),
-    temperature: readNumber(options.temperature, "temperature"),
-    prompt: readString(options.prompt, "prompt"),
+    ...sharedOverrides,
   };
 }
 
-export async function loadConfigDefaults(path: string): Promise<ConfigDefaults> {
+export async function loadConfigDefaults(
+  path: string,
+): Promise<ConfigDefaults> {
   const file = Bun.file(path);
   const exists = await file.exists();
   if (!exists) {
@@ -188,46 +253,64 @@ export async function loadConfigDefaults(path: string): Promise<ConfigDefaults> 
   try {
     parsed = await file.json();
   } catch {
-    fail(`Invalid JSON in config file: ${path}`);
+    fail(invalidJsonConfig(path));
   }
 
   if (!isRecord(parsed)) {
-    fail(`Config file must contain a JSON object: ${path}`);
+    fail(configMustBeObject(path));
   }
 
   const raw = parsed as RawConfig;
   const rawApi = raw.api;
   if (rawApi !== undefined && !isRecord(rawApi)) {
-    fail("Expected object for config property: api");
+    fail(expectedObjectProperty("api"));
   }
 
   const api = (rawApi ?? {}) as ConfigApi;
+  const sharedDefaults = Object.fromEntries(
+    SHARED_CONFIG_FIELDS.map((field) => [
+      field,
+      readSharedValueFromConfig(field, raw, api),
+    ]),
+  ) as Pick<ConfigDefaults, SharedConfigField>;
+
   return {
-    base: readString(api.base ?? api.b, "api.base"),
-    key: readString(api.key ?? api.k, "api.key"),
     audio: readString(raw.audio, "audio"),
-    model: readString(raw.model ?? raw.m, "model"),
-    temperature: readNumber(raw.temperature ?? raw.t, "temperature"),
-    prompt: readString(raw.prompt ?? raw.p, "prompt"),
+    ...sharedDefaults,
   };
 }
 
-export async function saveConfig(path: string, config: EffectiveConfig): Promise<void> {
-  const data: PersistedConfig = {
-    api: {
-      base: config.base,
-      key: config.key,
-    },
-    audio: config.audio,
-    model: config.model,
-  };
+type WritableConfig = {
+  base?: string;
+  key?: string;
+  audio?: string;
+  model?: string;
+  temperature?: number;
+};
+
+export async function saveConfig(path: string, config: WritableConfig): Promise<void> {
+  const data: PersistedConfig = {};
+
+  if (config.base !== undefined || config.key !== undefined) {
+    data.api = {};
+    if (config.base !== undefined) {
+      data.api.base = config.base;
+    }
+    if (config.key !== undefined) {
+      data.api.key = config.key;
+    }
+  }
+
+  if (config.audio !== undefined) {
+    data.audio = config.audio;
+  }
+
+  if (config.model !== undefined) {
+    data.model = config.model;
+  }
 
   if (config.temperature !== undefined) {
     data.temperature = config.temperature;
-  }
-
-  if (config.prompt !== undefined) {
-    data.prompt = config.prompt;
   }
 
   const configDir = getParentDirectory(path);
@@ -239,21 +322,25 @@ export function resolveConfig(
   defaults: ConfigDefaults,
   cli: CliOverrides,
 ): EffectiveConfig {
+  // Behavioral invariant: CLI values always override config defaults.
   const base = cli.base ?? defaults.base;
   const key = cli.key ?? defaults.key;
   const audio = cli.audio ?? defaults.audio;
   const model = cli.model ?? defaults.model;
   const temperature = cli.temperature ?? defaults.temperature;
-  const prompt = cli.prompt ?? defaults.prompt;
 
   const missing: string[] = [];
-  if (!base) missing.push("api.base (or --base/-b)");
-  if (!key) missing.push("api.key (or --key/-k)");
+  for (const required of REQUIRED_CONFIG_FIELD_HINTS) {
+    const value =
+      required.key === "base" ? base : required.key === "key" ? key : model;
+    if (!value) {
+      missing.push(required.hint);
+    }
+  }
   if (!audio) missing.push("audio (positional arg or config.audio)");
-  if (!model) missing.push("model (or --model/-m)");
 
   if (missing.length > 0) {
-    fail(`Missing required configuration: ${missing.join(", ")}`);
+    fail(missingRequiredConfiguration(missing));
   }
 
   return {
@@ -262,19 +349,17 @@ export function resolveConfig(
     audio: audio!,
     model: model!,
     temperature,
-    prompt,
   };
 }
 
 export async function runInteractiveConfigSetup(): Promise<void> {
   const defaults = await loadConfigDefaults(RESOLVED_CONFIG_PATH);
-  const config: EffectiveConfig = {
-    base: promptForRequiredString("api.base", defaults.base),
-    key: promptForRequiredString("api.key", defaults.key),
-    audio: promptForRequiredString("audio", defaults.audio),
-    model: promptForRequiredString("model", defaults.model),
+  const config: WritableConfig = {
+    base: promptForOptionalString("api.base", defaults.base),
+    key: promptForOptionalString("api.key", defaults.key),
+    audio: promptForOptionalString("audio", defaults.audio),
+    model: promptForOptionalString("model", defaults.model),
     temperature: promptForOptionalNumber("temperature", defaults.temperature),
-    prompt: promptForOptionalString("prompt", defaults.prompt),
   };
 
   await saveConfig(RESOLVED_CONFIG_PATH, config);

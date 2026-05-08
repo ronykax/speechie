@@ -2,6 +2,7 @@
 
 import { Command } from "commander";
 import {
+  CLI_OPTION_DEFINITIONS,
   type CliOptionValues,
   RESOLVED_CONFIG_PATH,
   loadConfigDefaults,
@@ -32,13 +33,13 @@ function buildProgram(): Command {
   program
     .name("speechie")
     .description("Transcribe an audio file")
-    .argument("[audio]", "Path to the audio file to transcribe")
-    .option("-b, --base <base>", "API base URL")
-    .option("-k, --key <key>", "API key")
-    .option("-m, --model <model>", "Transcription model")
-    .option("-t, --temperature <temperature>", "Sampling temperature")
-    .option("-p, --prompt <prompt>", "Optional transcription prompt")
-    .action(runTranscriptionCommand);
+    .argument("[audio]", "Path to the audio file to transcribe");
+
+  for (const option of CLI_OPTION_DEFINITIONS) {
+    program.option(option.flags, option.description);
+  }
+
+  program.action(runTranscriptionCommand);
 
   program
     .command("config")
