@@ -104,12 +104,16 @@ function getParentDirectory(path: string): string {
 }
 
 function promptInput(label: string, currentValue?: string): string {
-  const defaultHint = currentValue ? ` [${currentValue}]` : "";
-  const value = prompt(`${label}${defaultHint}: `);
+  const value = prompt(buildPromptLabel(label, currentValue));
   if (value === null) {
     fail("Configuration aborted.");
   }
   return value;
+}
+
+export function buildPromptLabel(label: string, currentValue?: string): string {
+  const defaultHint = currentValue ? ` [${currentValue}]` : "";
+  return `${label}${defaultHint}:`;
 }
 
 function promptForRequiredString(label: string, currentValue?: string): string {
