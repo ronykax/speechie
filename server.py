@@ -60,6 +60,8 @@ headers = {
     "Authorization": f"Bearer {os.getenv('LLM_API_KEY')}",
 }
 
+model = os.getenv("LLM_MODEL")
+
 
 @app.post("/transcribe")
 async def transcribe(file: UploadFile = File(...)):
@@ -82,7 +84,7 @@ async def transcribe(file: UploadFile = File(...)):
                     "content": raw_text,
                 },
             ],
-            "model": "llama-3.1-8b-instant",
+            "model": model,
             "temperature": 0.2,
             "max_completion_tokens": 4096,
             "top_p": 1,

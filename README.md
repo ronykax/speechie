@@ -6,6 +6,7 @@ speech to text thing that runs on my home server.
   ```
   LLM_API_KEY=abc123
   LLM_BASE_URL=https://api.example.com/v1/chat/completions
+  LLM_MODEL=llama-3.1-8b-instant
   ```
 - create a `dictionary.txt` file (words to recognize, one per line)
   ```
