@@ -1,18 +1,6 @@
-import asyncio
 import os
-import tempfile
 
-import nemo.collections.asr as nemo_asr
 import requests
-from fastapi import FastAPI, File, UploadFile
-
-app = FastAPI()
-
-asr_model = nemo_asr.models.ASRModel.from_pretrained(
-    "nvidia/parakeet-tdt-0.6b-v3",
-    map_location="cpu",  # type: ignore
-)
-asr_model = asr_model.cuda()  # type: ignore
 
 with open("dictionary.txt", "r", encoding="utf-8") as f:
     word_list = ", ".join(line.strip() for line in f if line.strip())
@@ -63,39 +51,30 @@ headers = {
 model = os.getenv("LLM_MODEL")
 
 
-@app.post("/transcribe")
-async def transcribe(file: UploadFile = File(...)):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_wav:
-        temp_wav.write(await file.read())
-        temp_path = temp_wav.name
+def clean_transcript(raw_text: str) -> str:
+    payload = {
+        "messages": [
+            {
+                "role": "system",
+                "content": system_prompt,
+            },
+            {
+                "role": "user",
+                "content": raw_text,
+            },
+        ],
+        "model": model,
+        "temperature": 0,
+        "max_completion_tokens": 4096,
+        "top_p": 1,
+        "stop": None,
+    }
 
     try:
-        output = await asyncio.to_thread(asr_model.transcribe, [temp_path])  # type: ignore
-        raw_text = output[0].text.rstrip() + " "
-
-        payload = {
-            "messages": [
-                {
-                    "role": "system",
-                    "content": system_prompt,
-                },
-                {
-                    "role": "user",
-                    "content": raw_text,
-                },
-            ],
-            "model": model,
-            "temperature": 0.2,
-            "max_completion_tokens": 4096,
-            "top_p": 1,
-            "stop": None,
-        }
-
         response = requests.post(f"{url}", headers=headers, json=payload)
-
+        response.raise_for_status()
         data = response.json()
-        text = data["choices"][0]["message"]["content"]
-
-        return {"text": text}
-    finally:
-        os.remove(temp_path)
+        return data["choices"][0]["message"]["content"]
+    except Exception:
+        # If the LLM call fails for any reason, return the raw_text directly
+        return raw_text
