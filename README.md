@@ -16,7 +16,7 @@ speech to text thing that runs on my home server.
   ```
 - start the server:
   ```zsh
-  uv run uvicorn server:app --host 0.0.0.0 --port 8000 --env-file .env
+  uv run uvicorn main:app --host 0.0.0.0 --port 8000 --env-file .env
   ```
 
 ## usage
