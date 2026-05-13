@@ -19,6 +19,7 @@ async def transcribe(file: UploadFile = File(...)):
     try:
         raw_text = await asyncio.to_thread(get_raw_transcript, temp_path)
         text = clean_transcript(raw_text)
+        text = text.strip() + " "
 
         return {"text": text}
     finally:
