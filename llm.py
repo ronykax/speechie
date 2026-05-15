@@ -1,3 +1,4 @@
+import json
 import os
 
 import requests
@@ -41,30 +42,35 @@ headers = {
 model = os.getenv("LLM_MODEL")
 
 
-def clean_transcript(raw_text: str) -> str:
+def clean_transcript(raw_text: str):
     payload = {
         "messages": [
-            {
-                "role": "system",
-                "content": system_prompt,
-            },
-            {
-                "role": "user",
-                "content": raw_text,
-            },
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": raw_text},
         ],
         "model": model,
         "temperature": 0,
         "max_completion_tokens": 4096,
         "top_p": 1,
         "stop": None,
+        "stream": True,
     }
 
     try:
-        response = requests.post(f"{url}", headers=headers, json=payload)  # type: ignore
+        response = requests.post(url, headers=headers, json=payload, stream=True)  # type: ignore
         response.raise_for_status()
-        data = response.json()
-        return data["choices"][0]["message"]["content"]
+
+        for line in response.iter_lines():
+            if not line:
+                continue
+            if line.startswith(b"data: "):
+                data = line[len(b"data: ") :]
+                if data == b"[DONE]":
+                    break
+                chunk = json.loads(data)
+                delta = chunk["choices"][0]["delta"].get("content")
+                if delta:
+                    yield delta
+
     except Exception:
-        # If the LLM call fails for any reason, return the raw_text directly
-        return raw_text
+        yield raw_text
