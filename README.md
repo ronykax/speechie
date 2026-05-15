@@ -24,5 +24,5 @@ speech to text thing that runs on my home server.
 ```zsh
 curl -X POST "http://localhost:8000/transcribe" \
     -H "Content-Type: multipart/form-data" \
-    -F "file=@/path/to/audio.wav"
+    -F "file=@/path/to/audio.wav --no-buffer"
 ```
